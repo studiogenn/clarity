@@ -1,158 +1,78 @@
 @import "tailwindcss";
 
 @theme {
-  --color-warm-white: #FAFAF8;
-  --color-pure-white: #FFFFFF;
-  --color-cream: #F7F5F2;
-  --color-cream-dark: #EDE9E3;
-  --color-sage: #8BA78E;
-  --color-sage-light: #8BA78E20;
-  --color-sage-medium: #8BA78E40;
-  --color-blush: #D4A0A0;
-  --color-blush-light: #D4A0A020;
-  --color-blush-medium: #D4A0A040;
-  --color-text: #4A4A4A;
-  --color-text-muted: #8A8A8A;
-  --color-text-light: #B0AAAA;
-  --color-border: #E8E4DF;
-  --color-border-light: #F0ECE7;
-  --font-serif: "Playfair Display", Georgia, serif;
-  --font-sans: "DM Sans", system-ui, sans-serif;
+  --color-bg: #FAF5FF;
+  --color-white: #FFFFFF;
+  --color-lavender: #8B5CF6;
+  --color-lavender-light: #C4B5FD;
+  --color-lavender-soft: #EDE9FE;
+  --color-lavender-bg: #F5F3FF;
+  --color-green: #10B981;
+  --color-green-light: #D1FAE5;
+  --color-rose: #F9A8D4;
+  --color-rose-soft: #FDF2F8;
+  --color-text: #1E1B4B;
+  --color-text-secondary: #6B7280;
+  --color-text-muted: #9CA3AF;
+  --color-border: #E5E7EB;
+  --color-border-light: #F3F4F6;
+  --font-heading: "Lora", Georgia, serif;
+  --font-body: "Raleway", system-ui, sans-serif;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-html {
-  scroll-behavior: smooth;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 
 body {
-  font-family: var(--font-sans);
-  background-color: var(--color-warm-white);
+  font-family: var(--font-body);
+  background: linear-gradient(135deg, #FAF5FF 0%, #F5F3FF 50%, #FDF2F8 100%);
+  background-attachment: fixed;
   color: var(--color-text);
-  line-height: 1.6;
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: var(--color-warm-white);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--color-cream-dark);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-light);
-}
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-lavender-light); border-radius: 10px; }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
-@keyframes fadeInSlow {
-  from { opacity: 0; }
-  to { opacity: 1; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes gentlePulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+@keyframes dotBounce {
+  0%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-4px); }
 }
 
-@keyframes pulse-soft {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
-}
-
-@keyframes breathe {
-  0%, 100% { transform: scale(1); opacity: 0.6; }
-  50% { transform: scale(1.02); opacity: 1; }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.5s ease-out forwards;
-}
-
-.animate-fade-in-slow {
-  animation: fadeInSlow 0.8s ease-out forwards;
-}
-
-.animate-pulse-soft {
-  animation: pulse-soft 2s ease-in-out infinite;
-}
-
-.animate-breathe {
-  animation: breathe 4s ease-in-out infinite;
-}
-
-.stagger-children > * {
-  opacity: 0;
-  animation: fadeIn 0.5s ease-out forwards;
-}
-.stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
-.stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
-.stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
-.stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
-.stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
-.stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
-.stagger-children > *:nth-child(7) { animation-delay: 0.35s; }
-.stagger-children > *:nth-child(8) { animation-delay: 0.4s; }
+.animate-fade-up { animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+.animate-gentle-pulse { animation: gentlePulse 2s ease-in-out infinite; }
+.dot-bounce-1 { animation: dotBounce 1.4s ease-in-out infinite; }
+.dot-bounce-2 { animation: dotBounce 1.4s ease-in-out 0.2s infinite; }
+.dot-bounce-3 { animation: dotBounce 1.4s ease-in-out 0.4s infinite; }
 
 input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--color-cream-dark);
-  outline: none;
-  transition: background 0.2s;
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 4px; border-radius: 2px;
+  background: var(--color-lavender-soft); outline: none;
 }
 input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--color-sage);
-  cursor: pointer;
-  box-shadow: 0 2px 8px rgba(139, 167, 142, 0.3);
+  -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--color-lavender); cursor: pointer;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
   transition: transform 0.2s, box-shadow 0.2s;
 }
 input[type="range"]::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-  box-shadow: 0 2px 12px rgba(139, 167, 142, 0.4);
+  transform: scale(1.15); box-shadow: 0 2px 12px rgba(139, 92, 246, 0.45);
 }
 input[type="range"]::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--color-sage);
-  cursor: pointer;
-  border: none;
-  box-shadow: 0 2px 8px rgba(139, 167, 142, 0.3);
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--color-lavender); border: none; cursor: pointer;
 }
 
-textarea {
-  resize: none;
-}
-textarea:focus, input:focus {
-  outline: none;
-}
-
-/* Soft card shadow */
-.card-shadow {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 4px 12px rgba(0, 0, 0, 0.03);
-}
-
-.card-shadow-hover {
-  transition: box-shadow 0.3s ease, transform 0.2s ease;
-}
-.card-shadow-hover:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.04);
-  transform: translateY(-1px);
-}
+textarea, input { resize: none; }
+textarea:focus, input:focus { outline: none; }
