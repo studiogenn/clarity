@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '../context/AuthContext'
 import { sendToClaude, getSystemPrompt } from '../lib/claude'
-import { saveCheckIn, getTodayCheckIn, getRecentCheckIns, getDailyContent, saveDailyContent } from '../lib/store'
+import { saveCheckIn, getTodayCheckIn, getRecentCheckIns, getDailyContent, saveDailyContent, getLifeAudit } from '../lib/store'
 import { format } from 'date-fns'
 import type { CheckIn, DailyContent } from '../lib/types'
 
 export default function Home() {
-  const { profile } = useAuth()
   const [mood, setMood] = useState(5)
   const [energy, setEnergy] = useState(5)
   const [anxiety, setAnxiety] = useState(5)
@@ -24,10 +22,9 @@ export default function Home() {
 
   async function loadTodayData() {
     try {
-      const [checkin, content] = await Promise.all([
-        getTodayCheckIn(),
-        getDailyContent(),
-      ])
+      const checkin = getTodayCheckIn()
+      const content = getDailyContent()
+
       setTodayCheckin(checkin)
       if (checkin?.claude_response) {
         setClaudeResponse(checkin.claude_response)
@@ -46,33 +43,36 @@ export default function Home() {
 
   async function generateDailyContent() {
     try {
-      const recentCheckins = await getRecentCheckIns(3)
+      const recentCheckins = getRecentCheckIns(3)
+      const lifeAudit = getLifeAudit()
       const context = recentCheckins.length > 0
         ? `Recent check-ins for context:\n${recentCheckins.map(c =>
             `- ${c.date}: Mood ${c.overall_mood}/10, Energy ${c.energy}/10, Anxiety ${c.anxiety}/10${c.freeform_note ? `, Note: "${c.freeform_note}"` : ''}`
           ).join('\n')}`
         : 'This is her first time using Clarity.'
 
+      const systemPrompt = getSystemPrompt(lifeAudit || undefined, context)
+
       const [affirmation, challenge] = await Promise.all([
         sendToClaude(
           [{ role: 'user', content: 'Generate a single-line daily affirmation for Danielle. Not generic — make it specific to where she seems to be emotionally right now. One sentence only. No quotes.' }],
-          getSystemPrompt(context),
+          systemPrompt,
           150
         ),
         sendToClaude(
           [{ role: 'user', content: 'Generate one tiny micro-challenge for Danielle today. Something she can do in under 5 minutes that will shift her state. Be specific. One or two sentences max.' }],
-          getSystemPrompt(context),
+          systemPrompt,
           150
         ),
       ])
 
       const today = format(new Date(), 'yyyy-MM-dd')
-      const saved = await saveDailyContent({
+      const saved = saveDailyContent({
         date: today,
         affirmation,
         micro_challenge: challenge,
       })
-      if (saved) setDailyContent(saved)
+      setDailyContent(saved)
     } catch (err) {
       console.error('Error generating daily content:', err)
     }
@@ -82,9 +82,9 @@ export default function Home() {
     setSubmitting(true)
     try {
       const today = format(new Date(), 'yyyy-MM-dd')
+      const lifeAudit = getLifeAudit()
 
-      // Get Claude's response
-      const recentCheckins = await getRecentCheckIns(7)
+      const recentCheckins = getRecentCheckIns(7)
       const checkinContext = recentCheckins.length > 0
         ? `Her recent check-ins:\n${recentCheckins.slice(0, 5).map(c =>
             `- ${c.date}: Mood ${c.overall_mood}/10, Energy ${c.energy}/10, Anxiety ${c.anxiety}/10, Clarity ${c.clarity}/10${c.freeform_note ? ` — "${c.freeform_note}"` : ''}`
@@ -109,13 +109,13 @@ Keep it natural and conversational. Not clinical.`
 
       const response = await sendToClaude(
         [{ role: 'user', content: userMessage }],
-        getSystemPrompt(),
+        getSystemPrompt(lifeAudit || undefined),
         500
       )
 
       setClaudeResponse(response)
 
-      const saved = await saveCheckIn({
+      const saved = saveCheckIn({
         date: today,
         overall_mood: mood,
         energy,
@@ -123,10 +123,9 @@ Keep it natural and conversational. Not clinical.`
         clarity,
         freeform_note: note || null,
         claude_response: response,
-        emotion_tags: null,
       })
 
-      if (saved) setTodayCheckin(saved)
+      setTodayCheckin(saved)
     } catch (err) {
       console.error('Error submitting check-in:', err)
     } finally {
@@ -135,35 +134,34 @@ Keep it natural and conversational. Not clinical.`
   }
 
   const greeting = getGreeting()
-  const name = profile?.name || 'Danielle'
 
   return (
     <div className="stagger-children">
       {/* Greeting */}
-      <div className="mb-8">
-        <p className="text-cream-muted text-sm mb-1">{format(new Date(), 'EEEE, MMMM d')}</p>
-        <h1 className="font-serif text-3xl md:text-4xl text-cream">
-          {greeting}, {name}
+      <div className="mb-10">
+        <p className="text-text-muted text-sm mb-1.5">{format(new Date(), 'EEEE, MMMM d')}</p>
+        <h1 className="font-serif text-3xl md:text-4xl text-text">
+          {greeting}, Danielle
         </h1>
       </div>
 
       {/* Daily Affirmation & Challenge */}
       {(dailyContent || loadingContent) && (
-        <div className="mb-8 space-y-4">
-          <div className="bg-deep border border-border rounded-2xl p-6">
-            <p className="text-amber text-xs uppercase tracking-widest mb-2">Today's Affirmation</p>
+        <div className="mb-10 space-y-4">
+          <div className="bg-pure-white border border-border-light rounded-2xl p-6 card-shadow">
+            <p className="text-sage text-xs uppercase tracking-widest mb-2.5 font-medium">Today's Affirmation</p>
             {loadingContent ? (
-              <div className="h-5 bg-surface rounded animate-pulse-soft w-3/4" />
+              <div className="h-5 bg-cream rounded-lg animate-pulse-soft w-3/4" />
             ) : (
-              <p className="text-cream font-serif text-lg italic">{dailyContent?.affirmation}</p>
+              <p className="text-text font-serif text-lg italic leading-relaxed">{dailyContent?.affirmation}</p>
             )}
           </div>
-          <div className="bg-deep border border-border rounded-2xl p-6">
-            <p className="text-sage text-xs uppercase tracking-widest mb-2">Micro-Challenge</p>
+          <div className="bg-pure-white border border-border-light rounded-2xl p-6 card-shadow">
+            <p className="text-blush text-xs uppercase tracking-widest mb-2.5 font-medium">Micro-Challenge</p>
             {loadingContent ? (
-              <div className="h-5 bg-surface rounded animate-pulse-soft w-2/3" />
+              <div className="h-5 bg-cream rounded-lg animate-pulse-soft w-2/3" />
             ) : (
-              <p className="text-cream-muted">{dailyContent?.micro_challenge}</p>
+              <p className="text-text-muted leading-relaxed">{dailyContent?.micro_challenge}</p>
             )}
           </div>
         </div>
@@ -171,58 +169,58 @@ Keep it natural and conversational. Not clinical.`
 
       {/* Check-in form or response */}
       {todayCheckin && claudeResponse ? (
-        <div className="animate-fade-in">
-          <div className="bg-deep border border-border rounded-2xl p-6 mb-4">
-            <p className="text-amber text-xs uppercase tracking-widest mb-3">Today's Check-In</p>
-            <div className="grid grid-cols-4 gap-4 mb-4">
-              <MoodBadge label="Mood" value={todayCheckin.overall_mood} color="amber" />
-              <MoodBadge label="Energy" value={todayCheckin.energy} color="sage" />
-              <MoodBadge label="Anxiety" value={todayCheckin.anxiety} color="rose" />
-              <MoodBadge label="Clarity" value={todayCheckin.clarity} color="sky" />
+        <div className="animate-fade-in space-y-4">
+          <div className="bg-pure-white border border-border-light rounded-2xl p-6 card-shadow">
+            <p className="text-sage text-xs uppercase tracking-widest mb-4 font-medium">Today's Check-In</p>
+            <div className="grid grid-cols-4 gap-3 mb-4">
+              <MoodBadge label="Mood" value={todayCheckin.overall_mood} variant="sage" />
+              <MoodBadge label="Energy" value={todayCheckin.energy} variant="blush" />
+              <MoodBadge label="Anxiety" value={todayCheckin.anxiety} variant="warm" />
+              <MoodBadge label="Clarity" value={todayCheckin.clarity} variant="sage" />
             </div>
             {todayCheckin.freeform_note && (
-              <p className="text-cream-muted text-sm italic mb-4">"{todayCheckin.freeform_note}"</p>
+              <p className="text-text-muted text-sm italic">"{todayCheckin.freeform_note}"</p>
             )}
           </div>
-          <div className="bg-deep border border-amber/20 rounded-2xl p-6">
-            <p className="text-amber text-xs uppercase tracking-widest mb-3">Clarity's Reflection</p>
-            <div className="text-cream-muted leading-relaxed whitespace-pre-wrap">{claudeResponse}</div>
+          <div className="bg-cream/50 border border-sage-light rounded-2xl p-6 card-shadow">
+            <p className="text-sage text-xs uppercase tracking-widest mb-3 font-medium">Clarity's Reflection</p>
+            <div className="text-text leading-relaxed whitespace-pre-wrap">{claudeResponse}</div>
           </div>
         </div>
       ) : (
-        <div className="bg-deep border border-border rounded-2xl p-6 md:p-8">
-          <h2 className="font-serif text-xl text-cream mb-6">How are you feeling?</h2>
+        <div className="bg-pure-white border border-border-light rounded-2xl p-6 md:p-8 card-shadow">
+          <h2 className="font-serif text-xl text-text mb-8">How are you feeling?</h2>
 
-          <div className="space-y-6 mb-6">
-            <SliderField label="Overall feeling" value={mood} onChange={setMood} color="amber" />
-            <SliderField label="Energy level" value={energy} onChange={setEnergy} color="sage" />
-            <SliderField label="Anxiety level" value={anxiety} onChange={setAnxiety} color="rose" />
-            <SliderField label="Clarity of mind" value={clarity} onChange={setClarity} color="sky" />
+          <div className="space-y-7 mb-8">
+            <SliderField label="Overall feeling" value={mood} onChange={setMood} color="sage" />
+            <SliderField label="Energy level" value={energy} onChange={setEnergy} color="blush" />
+            <SliderField label="Anxiety level" value={anxiety} onChange={setAnxiety} color="warm" />
+            <SliderField label="Clarity of mind" value={clarity} onChange={setClarity} color="sage" />
           </div>
 
-          <div className="mb-6">
-            <label className="text-cream-muted text-sm block mb-2">What's on your mind right now?</label>
+          <div className="mb-8">
+            <label className="text-text-muted text-sm block mb-2">What's on your mind right now?</label>
             <textarea
               value={note}
               onChange={e => setNote(e.target.value)}
               placeholder="Optional — whatever you want to share..."
               rows={3}
-              className="w-full bg-surface border border-border rounded-xl px-4 py-3 text-cream placeholder:text-cream-muted/40 focus:border-amber/40 transition-colors"
+              className="w-full bg-cream/50 border border-border rounded-xl px-4 py-3.5 text-text placeholder:text-text-light focus:border-sage/50 focus:bg-pure-white transition-all"
             />
           </div>
 
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="w-full bg-amber/20 text-amber border border-amber/30 rounded-xl py-3.5 font-medium hover:bg-amber/30 transition-all disabled:opacity-50"
+            className="w-full bg-sage text-pure-white rounded-2xl py-4 font-medium hover:bg-sage/90 transition-all disabled:opacity-50 shadow-sm"
           >
             {submitting ? (
               <span className="flex items-center justify-center gap-2">
-                <span className="w-4 h-4 border-2 border-amber/30 border-t-amber rounded-full animate-spin" />
+                <span className="w-4 h-4 border-2 border-pure-white/30 border-t-pure-white rounded-full animate-spin" />
                 Reflecting...
               </span>
             ) : (
-              'Submit Check-In'
+              'Check In'
             )}
           </button>
         </div>
@@ -233,16 +231,15 @@ Keep it natural and conversational. Not clinical.`
 
 function SliderField({ label, value, onChange, color }: { label: string; value: number; onChange: (v: number) => void; color: string }) {
   const colorMap: Record<string, string> = {
-    amber: 'text-amber',
     sage: 'text-sage',
-    rose: 'text-rose',
-    sky: 'text-sky',
+    blush: 'text-blush',
+    warm: 'text-text',
   }
   return (
     <div>
-      <div className="flex justify-between items-center mb-2">
-        <span className="text-cream-muted text-sm">{label}</span>
-        <span className={`text-sm font-medium ${colorMap[color]}`}>{value}/10</span>
+      <div className="flex justify-between items-center mb-2.5">
+        <span className="text-text-muted text-sm">{label}</span>
+        <span className={`text-sm font-medium ${colorMap[color] || 'text-text'}`}>{value}/10</span>
       </div>
       <input
         type="range"
@@ -256,23 +253,16 @@ function SliderField({ label, value, onChange, color }: { label: string; value: 
   )
 }
 
-function MoodBadge({ label, value, color }: { label: string; value: number; color: string }) {
-  const bgMap: Record<string, string> = {
-    amber: 'bg-amber-glow',
-    sage: 'bg-sage-soft',
-    rose: 'bg-rose-soft',
-    sky: 'bg-sky-soft',
-  }
-  const textMap: Record<string, string> = {
-    amber: 'text-amber',
-    sage: 'text-sage',
-    rose: 'text-rose',
-    sky: 'text-sky',
+function MoodBadge({ label, value, variant }: { label: string; value: number; variant: string }) {
+  const styles: Record<string, string> = {
+    sage: 'bg-sage-light text-sage',
+    blush: 'bg-blush-light text-blush',
+    warm: 'bg-cream text-text',
   }
   return (
-    <div className={`${bgMap[color]} rounded-xl p-3 text-center`}>
-      <p className={`text-lg font-medium ${textMap[color]}`}>{value}</p>
-      <p className="text-cream-muted text-[10px] uppercase tracking-wider">{label}</p>
+    <div className={`${styles[variant] || styles.sage} rounded-2xl p-3 text-center`}>
+      <p className="text-lg font-medium">{value}</p>
+      <p className="text-[10px] uppercase tracking-wider text-text-muted">{label}</p>
     </div>
   )
 }

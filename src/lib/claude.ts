@@ -2,7 +2,7 @@ import type { ChatMessage } from './types'
 
 const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY
 
-const LIFE_AUDIT_CONTEXT = `Key context about Danielle (her Life Audit — always reference this):
+const DEFAULT_LIFE_AUDIT = `Key context about Danielle (her Life Audit — always reference this):
 
 PHYSICAL HEALTH (6.5/10): Good genetics, strong cardio base, half marathon next month. Wants more definition, starting tennis. Not pushing hard enough in the gym — has more in her than she's using.
 
@@ -36,8 +36,6 @@ Your role is to:
 - Remind her of her own strength and momentum when she can't see it herself
 - Be honest even when it's uncomfortable — she wants truth, not validation
 
-${LIFE_AUDIT_CONTEXT}
-
 WHAT SHE NEEDS FROM CLARITY:
 - Help differentiating her emotions (she feels overwhelmed but can't name why)
 - Reality checks — is what she's telling herself actually true?
@@ -49,8 +47,9 @@ Tone: Never clinical. Never preachy. Never overly positive. Warm, grounded, dire
 
 If she seems to be in real crisis, gently encourage her to reach out to a professional or trusted person — but don't overdo this. She knows herself.`
 
-export function getSystemPrompt(additionalContext?: string): string {
-  let prompt = BASE_SYSTEM_PROMPT
+export function getSystemPrompt(lifeAuditContent?: string, additionalContext?: string): string {
+  const lifeAudit = lifeAuditContent || DEFAULT_LIFE_AUDIT
+  let prompt = `${BASE_SYSTEM_PROMPT}\n\n${lifeAudit}`
   if (additionalContext) {
     prompt += `\n\nAdditional context for this conversation:\n${additionalContext}`
   }
@@ -162,4 +161,4 @@ export async function sendToClaude(
   return data.content[0]?.text || ''
 }
 
-export { LIFE_AUDIT_CONTEXT, BASE_SYSTEM_PROMPT }
+export { DEFAULT_LIFE_AUDIT, BASE_SYSTEM_PROMPT }

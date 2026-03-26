@@ -1,208 +1,109 @@
-import { supabase } from './supabase'
-import type { CheckIn, ChatSession, EmotionAudit, WeeklyReport, DailyContent, Profile } from './types'
 import { format, subDays } from 'date-fns'
+import type { CheckIn, ChatSession, DailyContent } from './types'
 
-// Profile
-export async function getProfile(): Promise<Profile | null> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
+// --- localStorage helpers ---
 
-  const { data } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
-  return data
+function getItem<T>(key: string, fallback: T): T {
+  try {
+    const item = localStorage.getItem(key)
+    return item ? JSON.parse(item) : fallback
+  } catch {
+    return fallback
+  }
 }
 
-export async function updateProfile(updates: Partial<Profile>): Promise<void> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
-
-  await supabase
-    .from('profiles')
-    .update(updates)
-    .eq('id', user.id)
+function setItem(key: string, value: unknown): void {
+  localStorage.setItem(key, JSON.stringify(value))
 }
 
-// Check-ins
-export async function saveCheckIn(checkin: Omit<CheckIn, 'id' | 'user_id' | 'created_at'>): Promise<CheckIn | null> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data, error } = await supabase
-    .from('checkins')
-    .insert({ ...checkin, user_id: user.id })
-    .select()
-    .single()
-
-  if (error) console.error('Save checkin error:', error)
-  return data
+function generateId(): string {
+  return crypto.randomUUID()
 }
 
-export async function getTodayCheckIn(): Promise<CheckIn | null> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
+// --- Check-ins ---
 
+export function saveCheckIn(
+  checkin: Omit<CheckIn, 'id' | 'created_at'>
+): CheckIn {
+  const checkins = getItem<CheckIn[]>('clarity_checkins', [])
+  const newCheckin: CheckIn = {
+    ...checkin,
+    id: generateId(),
+    created_at: new Date().toISOString(),
+  }
+  checkins.unshift(newCheckin)
+  setItem('clarity_checkins', checkins)
+  return newCheckin
+}
+
+export function getTodayCheckIn(): CheckIn | null {
+  const checkins = getItem<CheckIn[]>('clarity_checkins', [])
   const today = format(new Date(), 'yyyy-MM-dd')
-  const { data } = await supabase
-    .from('checkins')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('date', today)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single()
-
-  return data
+  return checkins.find(c => c.date === today) || null
 }
 
-export async function getRecentCheckIns(days: number = 7): Promise<CheckIn[]> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
-
+export function getRecentCheckIns(days: number = 7): CheckIn[] {
+  const checkins = getItem<CheckIn[]>('clarity_checkins', [])
   const since = format(subDays(new Date(), days), 'yyyy-MM-dd')
-  const { data } = await supabase
-    .from('checkins')
-    .select('*')
-    .eq('user_id', user.id)
-    .gte('date', since)
-    .order('created_at', { ascending: false })
-
-  return data || []
+  return checkins.filter(c => c.date >= since)
 }
 
-export async function getAllCheckIns(): Promise<CheckIn[]> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
-
-  const { data } = await supabase
-    .from('checkins')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-
-  return data || []
+export function getAllCheckIns(): CheckIn[] {
+  return getItem<CheckIn[]>('clarity_checkins', [])
 }
 
-// Chat sessions
-export async function saveChatSession(session: Omit<ChatSession, 'id' | 'user_id' | 'created_at'>): Promise<ChatSession | null> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
+// --- Chat sessions ---
 
-  const { data, error } = await supabase
-    .from('chat_sessions')
-    .insert({ ...session, user_id: user.id })
-    .select()
-    .single()
-
-  if (error) console.error('Save chat error:', error)
-  return data
+export function saveChatSession(
+  session: Omit<ChatSession, 'id' | 'created_at'>
+): ChatSession {
+  const sessions = getItem<ChatSession[]>('clarity_chats', [])
+  const newSession: ChatSession = {
+    ...session,
+    id: generateId(),
+    created_at: new Date().toISOString(),
+  }
+  sessions.unshift(newSession)
+  setItem('clarity_chats', sessions)
+  return newSession
 }
 
-export async function updateChatSession(id: string, updates: Partial<ChatSession>): Promise<void> {
-  await supabase
-    .from('chat_sessions')
-    .update(updates)
-    .eq('id', id)
+export function updateChatSession(
+  id: string,
+  updates: Partial<ChatSession>
+): void {
+  const sessions = getItem<ChatSession[]>('clarity_chats', [])
+  const index = sessions.findIndex(s => s.id === id)
+  if (index !== -1) {
+    sessions[index] = { ...sessions[index], ...updates }
+    setItem('clarity_chats', sessions)
+  }
 }
 
-export async function getChatSessions(): Promise<ChatSession[]> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
-
-  const { data } = await supabase
-    .from('chat_sessions')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-
-  return data || []
+export function getChatSessions(): ChatSession[] {
+  return getItem<ChatSession[]>('clarity_chats', [])
 }
 
-// Emotion audits
-export async function saveEmotionAudit(audit: Omit<EmotionAudit, 'id' | 'user_id' | 'created_at'>): Promise<EmotionAudit | null> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
+// --- Daily content ---
 
-  const { data, error } = await supabase
-    .from('emotion_audits')
-    .insert({ ...audit, user_id: user.id })
-    .select()
-    .single()
-
-  if (error) console.error('Save audit error:', error)
-  return data
-}
-
-export async function getEmotionAudits(): Promise<EmotionAudit[]> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
-
-  const { data } = await supabase
-    .from('emotion_audits')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-
-  return data || []
-}
-
-// Weekly reports
-export async function saveWeeklyReport(report: Omit<WeeklyReport, 'id' | 'user_id' | 'created_at'>): Promise<WeeklyReport | null> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
-  const { data, error } = await supabase
-    .from('weekly_reports')
-    .insert({ ...report, user_id: user.id })
-    .select()
-    .single()
-
-  if (error) console.error('Save report error:', error)
-  return data
-}
-
-export async function getWeeklyReports(): Promise<WeeklyReport[]> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return []
-
-  const { data } = await supabase
-    .from('weekly_reports')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-
-  return data || []
-}
-
-// Daily content
-export async function getDailyContent(): Promise<DailyContent | null> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-
+export function getDailyContent(): DailyContent | null {
   const today = format(new Date(), 'yyyy-MM-dd')
-  const { data } = await supabase
-    .from('daily_content')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('date', today)
-    .single()
-
-  return data
+  const key = `clarity_daily_${today}`
+  return getItem<DailyContent | null>(key, null)
 }
 
-export async function saveDailyContent(content: Omit<DailyContent, 'id' | 'user_id' | 'created_at'>): Promise<DailyContent | null> {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
+export function saveDailyContent(content: DailyContent): DailyContent {
+  const key = `clarity_daily_${content.date}`
+  setItem(key, content)
+  return content
+}
 
-  const { data, error } = await supabase
-    .from('daily_content')
-    .insert({ ...content, user_id: user.id })
-    .select()
-    .single()
+// --- Life audit ---
 
-  if (error) console.error('Save daily content error:', error)
-  return data
+export function getLifeAudit(): string {
+  return getItem<string>('clarity_life_audit', '')
+}
+
+export function saveLifeAudit(content: string): void {
+  setItem('clarity_life_audit', content)
 }

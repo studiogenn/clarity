@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { sendToClaudeStream, getSystemPrompt } from '../lib/claude'
-import { saveChatSession, updateChatSession } from '../lib/store'
+import { saveChatSession, updateChatSession, getLifeAudit } from '../lib/store'
 import type { ChatMessage } from '../lib/types'
 
 export default function Chat() {
@@ -37,23 +37,25 @@ export default function Chat() {
     setStreaming(true)
 
     // Save or create session
-    if (!sessionId) {
-      const session = await saveChatSession({
+    let currentSessionId = sessionId
+    if (!currentSessionId) {
+      const session = saveChatSession({
         title: userMessage.content.slice(0, 80),
         messages: newMessages,
-        summary: null,
       })
-      if (session) setSessionId(session.id)
+      currentSessionId = session.id
+      setSessionId(session.id)
     }
 
     // Add placeholder for assistant
-    const placeholderMessages = [...newMessages, { role: 'assistant' as const, content: '' }]
+    const placeholderMessages: ChatMessage[] = [...newMessages, { role: 'assistant', content: '' }]
     setMessages(placeholderMessages)
 
     try {
+      const lifeAudit = getLifeAudit()
       const fullResponse = await sendToClaudeStream(
         newMessages,
-        getSystemPrompt(),
+        getSystemPrompt(lifeAudit || undefined),
         (streamedText) => {
           setMessages(prev => {
             const updated = [...prev]
@@ -72,8 +74,8 @@ export default function Chat() {
       setMessages(finalMessages)
 
       // Save to session
-      if (sessionId) {
-        await updateChatSession(sessionId, { messages: finalMessages })
+      if (currentSessionId) {
+        updateChatSession(currentSessionId, { messages: finalMessages })
       }
     } catch (err) {
       console.error('Chat error:', err)
@@ -103,17 +105,17 @@ export default function Chat() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-6rem)] md:h-[calc(100vh-4rem)]">
+    <div className="flex flex-col h-[calc(100vh-8rem)] md:h-[calc(100vh-7rem)]">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="font-serif text-2xl text-cream">Talk to Clarity</h1>
-          <p className="text-cream-muted text-sm">Say whatever's on your mind</p>
+          <h1 className="font-serif text-2xl text-text">Talk to Clarity</h1>
+          <p className="text-text-muted text-sm">Say whatever's on your mind</p>
         </div>
         {messages.length > 0 && (
           <button
             onClick={startNew}
-            className="text-cream-muted text-sm hover:text-cream transition-colors px-3 py-1.5 rounded-lg hover:bg-surface"
+            className="text-text-muted text-sm hover:text-text transition-colors px-3 py-1.5 rounded-xl hover:bg-cream"
           >
             New conversation
           </button>
@@ -121,16 +123,16 @@ export default function Chat() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
+      <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-1">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center animate-fade-in-slow">
-            <div className="w-12 h-12 rounded-full bg-amber/10 flex items-center justify-center mb-4">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-amber">
+            <div className="w-14 h-14 rounded-full bg-sage-light flex items-center justify-center mb-5">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-sage">
                 <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
               </svg>
             </div>
-            <p className="text-cream-muted mb-2">What's on your mind?</p>
-            <p className="text-cream-muted/50 text-sm max-w-xs">
+            <p className="text-text mb-2 font-medium">What's on your mind?</p>
+            <p className="text-text-muted text-sm max-w-xs leading-relaxed">
               Talk about how you're feeling, what happened today, or anything you need to work through.
             </p>
           </div>
@@ -142,19 +144,23 @@ export default function Chat() {
             className={`animate-fade-in ${msg.role === 'user' ? 'flex justify-end' : ''}`}
           >
             <div
-              className={`max-w-[85%] rounded-2xl px-5 py-3.5 ${
+              className={`max-w-[85%] rounded-2xl px-5 py-4 ${
                 msg.role === 'user'
-                  ? 'bg-amber/15 text-cream ml-8'
-                  : 'bg-surface text-cream-muted mr-8'
+                  ? 'bg-sage text-pure-white ml-8'
+                  : 'bg-pure-white border border-border-light text-text mr-8 card-shadow'
               }`}
             >
               {msg.role === 'assistant' && (
-                <p className="text-amber text-[10px] uppercase tracking-widest mb-1">Clarity</p>
+                <p className="text-sage text-[10px] uppercase tracking-widest mb-1.5 font-medium">Clarity</p>
               )}
               <div className="whitespace-pre-wrap leading-relaxed text-sm">
                 {msg.content}
                 {msg.role === 'assistant' && !msg.content && streaming && (
-                  <span className="inline-block w-2 h-4 bg-amber/50 animate-pulse-soft ml-0.5" />
+                  <span className="inline-flex gap-1 ml-1">
+                    <span className="w-1.5 h-1.5 bg-sage/50 rounded-full animate-pulse-soft" />
+                    <span className="w-1.5 h-1.5 bg-sage/50 rounded-full animate-pulse-soft" style={{ animationDelay: '0.2s' }} />
+                    <span className="w-1.5 h-1.5 bg-sage/50 rounded-full animate-pulse-soft" style={{ animationDelay: '0.4s' }} />
+                  </span>
                 )}
               </div>
             </div>
@@ -164,7 +170,7 @@ export default function Chat() {
       </div>
 
       {/* Input */}
-      <div className="bg-deep border border-border rounded-2xl p-3 flex items-end gap-3">
+      <div className="bg-pure-white border border-border rounded-2xl p-3 flex items-end gap-3 card-shadow">
         <textarea
           ref={textareaRef}
           value={input}
@@ -172,12 +178,12 @@ export default function Chat() {
           onKeyDown={handleKeyDown}
           placeholder="Type here..."
           rows={1}
-          className="flex-1 bg-transparent text-cream placeholder:text-cream-muted/40 resize-none text-sm py-1.5"
+          className="flex-1 bg-transparent text-text placeholder:text-text-light resize-none text-sm py-1.5"
         />
         <button
           onClick={handleSend}
           disabled={!input.trim() || streaming}
-          className="p-2 rounded-xl bg-amber/20 text-amber hover:bg-amber/30 transition-all disabled:opacity-30 disabled:hover:bg-amber/20 shrink-0"
+          className="p-2.5 rounded-xl bg-sage text-pure-white hover:bg-sage/90 transition-all disabled:opacity-30 disabled:hover:bg-sage shrink-0"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="22" y1="2" x2="11" y2="13" />
